@@ -20,14 +20,14 @@ class DatasetDnPatch(data.Dataset):
         super(DatasetDnPatch, self).__init__()
         print('Get L/H for denosing on AWGN with fixed sigma. Only dataroot_H is needed.')
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
-        self.patch_size = opt['H_size'] if opt['H_size'] else 64
+        self.n_channels = opt['n_channels'] or 3
+        self.patch_size = opt['H_size'] or 64
 
-        self.sigma = opt['sigma'] if opt['sigma'] else 25
-        self.sigma_test = opt['sigma_test'] if opt['sigma_test'] else self.sigma
+        self.sigma = opt['sigma'] or 25
+        self.sigma_test = opt['sigma_test'] or self.sigma
 
-        self.num_patches_per_image = opt['num_patches_per_image'] if opt['num_patches_per_image'] else 40
-        self.num_sampled = opt['num_sampled'] if opt['num_sampled'] else 3000
+        self.num_patches_per_image = opt['num_patches_per_image'] or 40
+        self.num_sampled = opt['num_sampled'] or 3000
 
         # ------------------------------------
         # get paths of H
@@ -57,7 +57,7 @@ class DatasetDnPatch(data.Dataset):
         # update whole H patches
         # ------------------------------------
         """
-        self.index_sampled = random.sample(range(0, len(self.paths_H), 1), self.num_sampled)
+        self.index_sampled = random.sample(range(len(self.paths_H)), self.num_sampled)
         n_count = 0
 
         for i in range(len(self.index_sampled)):
@@ -127,7 +127,7 @@ class DatasetDnPatch(data.Dataset):
             patch_L, patch_H = util.single2tensor3(img_L), util.single2tensor3(img_H)
 
         L_path = H_path
-        return {'L': patch_L, 'H': patch_H, 'L_path': L_path, 'H_path': H_path}
+        return {'L': patch_L, 'H': patch_H, 'L_path': L_path, 'H_path': L_path}
 
     def __len__(self):
         return len(self.H_data)

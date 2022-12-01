@@ -18,8 +18,8 @@ class DatasetPlain(data.Dataset):
         super(DatasetPlain, self).__init__()
         print('Get L/H for image-to-image mapping. Both "paths_L" and "paths_H" are needed.')
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
-        self.patch_size = self.opt['H_size'] if self.opt['H_size'] else 64
+        self.n_channels = opt['n_channels'] or 3
+        self.patch_size = self.opt['H_size'] or 64
 
         # ------------------------------------
         # get the path of L/H
@@ -30,7 +30,9 @@ class DatasetPlain(data.Dataset):
         assert self.paths_H, 'Error: H path is empty.'
         assert self.paths_L, 'Error: L path is empty. Plain dataset assumes both L and H are given!'
         if self.paths_L and self.paths_H:
-            assert len(self.paths_L) == len(self.paths_H), 'L/H mismatch - {}, {}.'.format(len(self.paths_L), len(self.paths_H))
+            assert len(self.paths_L) == len(
+                self.paths_H
+            ), f'L/H mismatch - {len(self.paths_L)}, {len(self.paths_H)}.'
 
     def __getitem__(self, index):
 

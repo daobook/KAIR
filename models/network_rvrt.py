@@ -52,9 +52,13 @@ def flow_warp(x, flow, interp_mode='bilinear', padding_mode='zeros', align_corne
     vgrid_y = 2.0 * vgrid[:, :, :, 1] / max(h - 1, 1) - 1.0
     vgrid_scaled = torch.stack((vgrid_x, vgrid_y), dim=3)
 
-    output = F.grid_sample(x, vgrid_scaled, mode=interp_mode, padding_mode=padding_mode, align_corners=align_corners)
-
-    return output
+    return F.grid_sample(
+        x,
+        vgrid_scaled,
+        mode=interp_mode,
+        padding_mode=padding_mode,
+        align_corners=align_corners,
+    )
 
 
 def make_layer(block, num_blocks, **kwarg):
@@ -67,9 +71,7 @@ def make_layer(block, num_blocks, **kwarg):
     Returns:
         nn.Sequential: Stacked blocks in nn.Sequential.
     """
-    layers = []
-    for _ in range(num_blocks):
-        layers.append(block(**kwarg))
+    layers = [block(**kwarg) for _ in range(num_blocks)]
     return nn.Sequential(*layers)
 
 
@@ -118,8 +120,7 @@ class SpyNet(nn.Module):
         self.register_buffer('std', torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
 
     def preprocess(self, tensor_input):
-        tensor_output = (tensor_input - self.mean) / self.std
-        return tensor_output
+        return (tensor_input - self.mean) / self.std
 
     def process(self, ref, supp, w, h, w_floor, h_floor):
         flow_list = []
@@ -127,7 +128,7 @@ class SpyNet(nn.Module):
         ref = [self.preprocess(ref)]
         supp = [self.preprocess(supp)]
 
-        for level in range(5):
+        for _ in range(5):
             ref.insert(0, F.avg_pool2d(input=ref[0], kernel_size=2, stride=2, count_include_pad=False))
             supp.insert(0, F.avg_pool2d(input=supp[0], kernel_size=2, stride=2, count_include_pad=False))
 
@@ -273,9 +274,11 @@ def window_partition(x, window_size):
     B, D, H, W, C = x.shape
     x = x.view(B, D // window_size[0], window_size[0], H // window_size[1], window_size[1], W // window_size[2],
                window_size[2], C)
-    windows = x.permute(0, 1, 3, 5, 2, 4, 6, 7).contiguous().view(-1, reduce(mul, window_size), C)
-
-    return windows
+    return (
+        x.permute(0, 1, 3, 5, 2, 4, 6, 7)
+        .contiguous()
+        .view(-1, reduce(mul, window_size), C)
+    )
 
 
 def window_reverse(windows, window_size, B, D, H, W):
@@ -329,7 +332,10 @@ def compute_mask(D, H, W, window_size, shift_size, device):
     mask_windows = window_partition(img_mask, window_size)  # nW, ws[0]*ws[1]*ws[2], 1
     mask_windows = mask_windows.squeeze(-1)  # nW, ws[0]*ws[1]*ws[2]
     attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-    attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
+    attn_mask = attn_mask.masked_fill(attn_mask != 0, -100.0).masked_fill(
+        attn_mask == 0, 0.0
+    )
+
 
     return attn_mask
 
@@ -415,9 +421,7 @@ class WindowAttention(nn.Module):
             attn = attn.view(-1, self.num_heads, N, N)
 
         attn = F.softmax(attn, -1, dtype=q.dtype)  # Don't use attn.dtype after addition!
-        x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
-
-        return x
+        return (attn @ v).transpose(1, 2).reshape(B_, N, C)
 
     def get_position_index(self, window_size):
         ''' Get pair-wise relative position index for each token inside the window. '''
@@ -435,9 +439,7 @@ class WindowAttention(nn.Module):
 
         relative_coords[:, :, 0] *= (2 * window_size[1] - 1) * (2 * window_size[2] - 1)
         relative_coords[:, :, 1] *= (2 * window_size[2] - 1)
-        relative_position_index = relative_coords.sum(-1)  # Wd*Wh*Ww, Wd*Wh*Ww
-
-        return relative_position_index
+        return relative_coords.sum(-1)
 
 
 class STL(nn.Module):
@@ -594,7 +596,10 @@ class STG(nn.Module):
         super().__init__()
         self.input_resolution = input_resolution
         self.window_size = window_size
-        self.shift_size = list(i // 2 for i in window_size) if shift_size is None else shift_size
+        self.shift_size = (
+            [i // 2 for i in window_size] if shift_size is None else shift_size
+        )
+
 
         # build blocks
         self.blocks = nn.ModuleList([
@@ -716,24 +721,49 @@ class Upsample(nn.Sequential):
 
     def __init__(self, scale, num_feat):
         assert LooseVersion(torch.__version__) >= LooseVersion('1.8.1'), \
-            'PyTorch version >= 1.8.1 to support 5D PixelShuffle.'
+                'PyTorch version >= 1.8.1 to support 5D PixelShuffle.'
 
         m = []
         if (scale & (scale - 1)) == 0:  # scale = 2^n
             for _ in range(int(math.log(scale, 2))):
-                m.append(nn.Conv3d(num_feat, 4 * num_feat, kernel_size=(1, 3, 3), padding=(0, 1, 1)))
-                m.append(Rearrange('n c d h w -> n d c h w'))
-                m.append(nn.PixelShuffle(2))
-                m.append(Rearrange('n c d h w -> n d c h w'))
-                m.append(nn.LeakyReLU(negative_slope=0.1, inplace=True))
+                m.extend(
+                    (
+                        nn.Conv3d(
+                            num_feat,
+                            4 * num_feat,
+                            kernel_size=(1, 3, 3),
+                            padding=(0, 1, 1),
+                        ),
+                        Rearrange('n c d h w -> n d c h w'),
+                        nn.PixelShuffle(2),
+                        Rearrange('n c d h w -> n d c h w'),
+                        nn.LeakyReLU(negative_slope=0.1, inplace=True),
+                    )
+                )
+
             m.append(nn.Conv3d(num_feat, num_feat, kernel_size=(1, 3, 3), padding=(0, 1, 1)))
         elif scale == 3:
-            m.append(nn.Conv3d(num_feat, 9 * num_feat, kernel_size=(1, 3, 3), padding=(0, 1, 1)))
-            m.append(Rearrange('n c d h w -> n d c h w'))
-            m.append(nn.PixelShuffle(3))
-            m.append(Rearrange('n c d h w -> n d c h w'))
-            m.append(nn.LeakyReLU(negative_slope=0.1, inplace=True))
-            m.append(nn.Conv3d(num_feat, num_feat, kernel_size=(1, 3, 3), padding=(0, 1, 1)))
+            m.extend(
+                (
+                    nn.Conv3d(
+                        num_feat,
+                        9 * num_feat,
+                        kernel_size=(1, 3, 3),
+                        padding=(0, 1, 1),
+                    ),
+                    Rearrange('n c d h w -> n d c h w'),
+                    nn.PixelShuffle(3),
+                    Rearrange('n c d h w -> n d c h w'),
+                    nn.LeakyReLU(negative_slope=0.1, inplace=True),
+                    nn.Conv3d(
+                        num_feat,
+                        num_feat,
+                        kernel_size=(1, 3, 3),
+                        padding=(0, 1, 1),
+                    ),
+                )
+            )
+
         else:
             raise ValueError(f'scale {scale} is not supported. ' 'Supported scales: 2^n and 3.')
         super(Upsample, self).__init__(*m)
@@ -980,11 +1010,11 @@ class RVRT(nn.Module):
 
         n, t, _, h, w = flows.size()
         if 'backward' in module_name:
-            flow_idx = range(0, t + 1)[::-1]
-            clip_idx = range(0, (t + 1) // self.clip_size)[::-1]
+            flow_idx = range(t + 1)[::-1]
+            clip_idx = range((t + 1) // self.clip_size)[::-1]
         else:
             flow_idx = range(-1, t)
-            clip_idx = range(0, (t + 1) // self.clip_size)
+            clip_idx = range((t + 1) // self.clip_size)
 
         if '_1' in module_name:
             updated_flows[f'{module_name}_n1'] = []
@@ -995,7 +1025,7 @@ class RVRT(nn.Module):
             feat_prop = feat_prop.cuda()
 
         last_key = list(feats)[-2]
-        for i in range(0, len(clip_idx)):
+        for i in range(len(clip_idx)):
             idx_c = clip_idx[i]
             if i > 0:
                 if '_1' in module_name:
@@ -1022,20 +1052,19 @@ class RVRT(nn.Module):
                     else:
                         feat_q = feats[last_key][idx_c].cuda()
                         feat_k = feats[last_key][clip_idx[i - 1]].cuda()
+                elif 'backward' in module_name:
+                    feat_q = feats[last_key][idx_c].flip(1)
+                    feat_k = feats[last_key][clip_idx[i - 1]].flip(1)
                 else:
-                    if 'backward' in module_name:
-                        feat_q = feats[last_key][idx_c].flip(1)
-                        feat_k = feats[last_key][clip_idx[i - 1]].flip(1)
-                    else:
-                        feat_q = feats[last_key][idx_c]
-                        feat_k = feats[last_key][clip_idx[i - 1]]
+                    feat_q = feats[last_key][idx_c]
+                    feat_k = feats[last_key][clip_idx[i - 1]]
 
                 feat_prop_warped1 = flow_warp(feat_prop.flatten(0, 1),
                                            flow_n1.permute(0, 1, 3, 4, 2).flatten(0, 1))\
-                    .view(n, feat_prop.shape[1], feat_prop.shape[2], h, w)
+                        .view(n, feat_prop.shape[1], feat_prop.shape[2], h, w)
                 feat_prop_warped2 = flow_warp(feat_prop.flip(1).flatten(0, 1),
                                            flow_n2.permute(0, 1, 3, 4, 2).flatten(0, 1))\
-                    .view(n, feat_prop.shape[1], feat_prop.shape[2], h, w)
+                        .view(n, feat_prop.shape[1], feat_prop.shape[2], h, w)
 
                 if '_1' in module_name:
                     feat_prop, flow_n1, flow_n2 = self.deform_align[module_name](feat_q, feat_k, feat_prop,
@@ -1092,7 +1121,7 @@ class RVRT(nn.Module):
 
         if self.cpu_cache:
             outputs = []
-            for i in range(0, feats['shallow'].shape[1]):
+            for i in range(feats['shallow'].shape[1]):
                 hr = torch.cat([feats[k][:, i:i + 1, :, :, :] for k in feats], dim=2)
                 hr = self.reconstruction(hr.cuda())
                 hr = self.conv_last(self.upsampler(self.conv_before_upsampler(hr.transpose(1, 2)))).transpose(1, 2)
@@ -1126,13 +1155,13 @@ class RVRT(nn.Module):
         n, t, _, h, w = lqs.size()
 
         # whether to cache the features in CPU
-        self.cpu_cache = True if t > self.cpu_cache_length else False
+        self.cpu_cache = t > self.cpu_cache_length
 
         if self.upscale == 4:
             lqs_downsample = lqs.clone()
         else:
             lqs_downsample = F.interpolate(lqs[:, :, :3, :, :].view(-1, 3, h, w), scale_factor=0.25, mode='bicubic')\
-                .view(n, t, 3, h // 4, w // 4)
+                    .view(n, t, 3, h // 4, w // 4)
 
         # check whether the input is an extended sequence
         self.check_if_mirror_extended(lqs)
@@ -1141,7 +1170,7 @@ class RVRT(nn.Module):
         feats = {}
         if self.cpu_cache:
             feats['shallow'] = []
-            for i in range(0, t // self.clip_size):
+            for i in range(t // self.clip_size):
                 feat = self.feat_extract(lqs[:, i * self.clip_size:(i + 1) * self.clip_size, :, :, :]).cpu()
                 feats['shallow'].append(feat)
             flows_forward, flows_backward = self.compute_flow(lqs_downsample)

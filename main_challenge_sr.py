@@ -78,15 +78,15 @@ def main():
     # --------------------------------
     # define network and load model
     # --------------------------------
-    if model_name == 'msrresnet':
-        from models.network_msrresnet import MSRResNet1 as net
-        model = net(in_nc=3, out_nc=3, nc=64, nb=16, upscale=4)  # define network
-        model_path = os.path.join('model_zoo', 'msrresnet_x4_psnr.pth')  # set model path
-    elif model_name == 'imdn':
+    if model_name == 'imdn':
         from models.network_imdn import IMDN as net
         model = net(in_nc=3, out_nc=3, nc=64, nb=8, upscale=4, act_mode='L', upsample_mode='pixelshuffle')  # define network
         model_path = os.path.join('model_zoo', 'imdn_x4.pth')            # set model path
 
+    elif model_name == 'msrresnet':
+        from models.network_msrresnet import MSRResNet1 as net
+        model = net(in_nc=3, out_nc=3, nc=64, nb=16, upscale=4)  # define network
+        model_path = os.path.join('model_zoo', 'msrresnet_x4_psnr.pth')  # set model path
     model.load_state_dict(torch.load(model_path), strict=True)
     model.eval()
     for k, v in model.named_parameters():
@@ -114,7 +114,7 @@ def main():
     # read image
     # --------------------------------
     L_path = os.path.join(testsets, testset_L)
-    E_path = os.path.join(testsets, testset_L+'_'+model_name)
+    E_path = os.path.join(testsets, f'{testset_L}_{model_name}')
     util.mkdir(E_path)
 
     # record runtime
@@ -123,17 +123,11 @@ def main():
 
     logger.info('{:>16s} : {:s}'.format('Input Path', L_path))
     logger.info('{:>16s} : {:s}'.format('Output Path', E_path))
-    idx = 0
-
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
 
-    for img in util.get_image_paths(L_path):
+    for idx, img in enumerate(util.get_image_paths(L_path), start=1):
 
-        # --------------------------------
-        # (1) img_L
-        # --------------------------------
-        idx += 1
         img_name, ext = os.path.splitext(os.path.basename(img))
         logger.info('{:->4d}--> {:>10s}'.format(idx, img_name+ext))
 

@@ -26,7 +26,7 @@ class RRDB(nn.Module):
 
         m_head = B.conv(in_nc, nc, mode='C')
 
-        m_body = [B.RRDB(nc, gc=32, mode='C'+act_mode) for _ in range(nb)]
+        m_body = [B.RRDB(nc, gc=32, mode=f'C{act_mode}') for _ in range(nb)]
         m_body.append(B.conv(nc, nc, mode='C'))
 
         if upsample_mode == 'upconv':
@@ -39,11 +39,15 @@ class RRDB(nn.Module):
             raise NotImplementedError('upsample mode [{:s}] is not found'.format(upsample_mode))
 
         if upscale == 3:
-            m_uper = upsample_block(nc, nc, mode='3'+act_mode)
+            m_uper = upsample_block(nc, nc, mode=f'3{act_mode}')
         else:
-            m_uper = [upsample_block(nc, nc, mode='2'+act_mode) for _ in range(n_upscale)]
+            m_uper = [
+                upsample_block(nc, nc, mode=f'2{act_mode}')
+                for _ in range(n_upscale)
+            ]
 
-        H_conv0 = B.conv(nc, nc, mode='C'+act_mode)
+
+        H_conv0 = B.conv(nc, nc, mode=f'C{act_mode}')
         H_conv1 = B.conv(nc, out_nc, mode='C')
         m_tail = B.sequential(H_conv0, H_conv1)
 

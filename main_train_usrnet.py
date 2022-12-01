@@ -77,7 +77,10 @@ def main(json_path='options/train_usrnet.json'):
     # configure logger
     # ----------------------------------------
     logger_name = 'train'
-    utils_logger.logger_info(logger_name, os.path.join(opt['path']['log'], logger_name+'.log'))
+    utils_logger.logger_info(
+        logger_name, os.path.join(opt['path']['log'], f'{logger_name}.log')
+    )
+
     logger = logging.getLogger(logger_name)
     logger.info(option.dict2str(opt))
 
@@ -88,7 +91,7 @@ def main(json_path='options/train_usrnet.json'):
     seed = opt['train']['manual_seed']
     if seed is None:
         seed = random.randint(1, 10000)
-    logger.info('Random seed: {}'.format(seed))
+    logger.info(f'Random seed: {seed}')
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -105,7 +108,12 @@ def main(json_path='options/train_usrnet.json'):
     # 2) creat_dataloader for train and test
     # ----------------------------------------
     for phase, dataset_opt in opt['datasets'].items():
-        if phase == 'train':
+        if phase == 'test':
+            test_set = define_Dataset(dataset_opt)
+            test_loader = DataLoader(test_set, batch_size=1,
+                                     shuffle=False, num_workers=1,
+                                     drop_last=False, pin_memory=True)
+        elif phase == 'train':
             train_set = define_Dataset(dataset_opt)
             train_size = int(math.ceil(len(train_set) / dataset_opt['dataloader_batch_size']))
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(len(train_set), train_size))
@@ -115,13 +123,8 @@ def main(json_path='options/train_usrnet.json'):
                                       num_workers=dataset_opt['dataloader_num_workers'],
                                       drop_last=True,
                                       pin_memory=True)
-        elif phase == 'test':
-            test_set = define_Dataset(dataset_opt)
-            test_loader = DataLoader(test_set, batch_size=1,
-                                     shuffle=False, num_workers=1,
-                                     drop_last=False, pin_memory=True)
         else:
-            raise NotImplementedError("Phase [%s] is not recognized." % phase)
+            raise NotImplementedError(f"Phase [{phase}] is not recognized.")
 
     '''
     # ----------------------------------------
@@ -142,8 +145,7 @@ def main(json_path='options/train_usrnet.json'):
     '''
 
     for epoch in range(1000000):  # keep running
-        for i, train_data in enumerate(train_loader):
-
+        for train_data in train_loader:
             current_step += 1
 
             # -------------------------------

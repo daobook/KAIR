@@ -118,9 +118,13 @@ class ModelBase():
     def describe_network(self, network):
         network = self.get_bare_model(network)
         msg = '\n'
-        msg += 'Networks name: {}'.format(network.__class__.__name__) + '\n'
-        msg += 'Params number: {}'.format(sum(map(lambda x: x.numel(), network.parameters()))) + '\n'
-        msg += 'Net structure:\n{}'.format(str(network)) + '\n'
+        msg += f'Networks name: {network.__class__.__name__}' + '\n'
+        msg += (
+            f'Params number: {sum(map(lambda x: x.numel(), network.parameters()))}'
+            + '\n'
+        )
+
+        msg += f'Net structure:\n{str(network)}' + '\n'
         return msg
 
     # ----------------------------------------
@@ -131,7 +135,7 @@ class ModelBase():
         msg = '\n'
         msg += ' | {:^6s} | {:^6s} | {:^6s} | {:^6s} || {:<20s}'.format('mean', 'min', 'max', 'std', 'shape', 'param_name') + '\n'
         for name, param in network.state_dict().items():
-            if not 'num_batches_tracked' in name:
+            if 'num_batches_tracked' not in name:
                 v = param.data.clone().float()
                 msg += ' | {:>6.3f} | {:>6.3f} | {:>6.3f} | {:>6.3f} | {} || {:s}'.format(v.mean(), v.min(), v.max(), v.std(), v.shape, name) + '\n'
         return msg
@@ -147,7 +151,7 @@ class ModelBase():
     # save the state_dict of the network
     # ----------------------------------------
     def save_network(self, save_dir, network, network_label, iter_label):
-        save_filename = '{}_{}.pth'.format(iter_label, network_label)
+        save_filename = f'{iter_label}_{network_label}.pth'
         save_path = os.path.join(save_dir, save_filename)
         network = self.get_bare_model(network)
         state_dict = network.state_dict()
@@ -179,7 +183,7 @@ class ModelBase():
     # save the state_dict of the optimizer
     # ----------------------------------------
     def save_optimizer(self, save_dir, optimizer, optimizer_label, iter_label):
-        save_filename = '{}_{}.pth'.format(iter_label, optimizer_label)
+        save_filename = f'{iter_label}_{optimizer_label}.pth'
         save_path = os.path.join(save_dir, save_filename)
         torch.save(optimizer.state_dict(), save_path)
 
@@ -193,7 +197,7 @@ class ModelBase():
         netG = self.get_bare_model(self.netG)
         netG_params = dict(netG.named_parameters())
         netE_params = dict(self.netE.named_parameters())
-        for k in netG_params.keys():
+        for k in netG_params:
             netE_params[k].data.mul_(decay).add_(netG_params[k].data, alpha=1-decay)
 
     """

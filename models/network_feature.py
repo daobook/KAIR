@@ -40,7 +40,6 @@ class VGGFeatureExtractor(nn.Module):
     def forward(self, x):
         if self.use_input_norm:
             x = (x - self.mean) / self.std
-        output = self.features(x)
-        return output
+        return self.features(x)
 
 

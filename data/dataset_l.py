@@ -15,7 +15,7 @@ class DatasetL(data.Dataset):
         super(DatasetL, self).__init__()
         print('Read L in testing. Only "dataroot_L" is needed.')
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
+        self.n_channels = opt['n_channels'] or 3
 
         # ------------------------------------
         # get the path of L

@@ -45,7 +45,11 @@ class IMDN(nn.Module):
         assert 'R' in act_mode or 'L' in act_mode, 'Examples of activation function: R, L, BR, BL, IR, IL'
 
         m_head = B.conv(in_nc, nc, mode='C')
-        m_body = [B.IMDBlock(nc, nc, mode='C'+act_mode, negative_slope=negative_slope) for _ in range(nb)]
+        m_body = [
+            B.IMDBlock(nc, nc, mode=f'C{act_mode}', negative_slope=negative_slope)
+            for _ in range(nb)
+        ]
+
         m_body.append(B.conv(nc, nc, mode='C'))
 
         if upsample_mode == 'upconv':

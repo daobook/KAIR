@@ -71,7 +71,15 @@ class VGGFeatureExtractor(nn.Module):
             self.features = nn.Sequential()
             feature_layer = [-1] + feature_layer
             for i in range(len(feature_layer)-1):
-                self.features.add_module('child'+str(i), nn.Sequential(*list(model.features.children())[(feature_layer[i]+1):(feature_layer[i+1]+1)]))
+                self.features.add_module(
+                    f'child{str(i)}',
+                    nn.Sequential(
+                        *list(model.features.children())[
+                            (feature_layer[i] + 1) : (feature_layer[i + 1] + 1)
+                        ]
+                    ),
+                )
+
         else:
             self.features = nn.Sequential(*list(model.features.children())[:(feature_layer + 1)])
 
@@ -86,14 +94,13 @@ class VGGFeatureExtractor(nn.Module):
             x = (x + 1.0) / 2.0
         if self.use_input_norm:
             x = (x - self.mean) / self.std
-        if self.list_outputs:
-            output = []
-            for child_model in self.features.children():
-                x = child_model(x)
-                output.append(x.clone())
-            return output
-        else:
+        if not self.list_outputs:
             return self.features(x)
+        output = []
+        for child_model in self.features.children():
+            x = child_model(x)
+            output.append(x.clone())
+        return output
 
 
 class PerceptualLoss(nn.Module):
@@ -105,10 +112,7 @@ class PerceptualLoss(nn.Module):
         self.vgg = VGGFeatureExtractor(feature_layer=feature_layer, use_input_norm=use_input_norm, use_range_norm=use_range_norm)
         self.lossfn_type = lossfn_type
         self.weights = weights
-        if self.lossfn_type == 'l1':
-            self.lossfn = nn.L1Loss()
-        else:
-            self.lossfn = nn.MSELoss()
+        self.lossfn = nn.L1Loss() if self.lossfn_type == 'l1' else nn.MSELoss()
         print(f'feature_layer: {feature_layer}  with weights: {weights}')
 
     def forward(self, x, gt):
@@ -139,7 +143,7 @@ class GANLoss(nn.Module):
         self.real_label_val = real_label_val
         self.fake_label_val = fake_label_val
 
-        if self.gan_type == 'gan' or self.gan_type == 'ragan':
+        if self.gan_type in ['gan', 'ragan']:
             self.loss = nn.BCEWithLogitsLoss()
         elif self.gan_type == 'lsgan':
             self.loss = nn.MSELoss()
@@ -213,8 +217,7 @@ class CharbonnierLoss(nn.Module):
 
     def forward(self, x, y):
         diff = x - y
-        loss = torch.mean(torch.sqrt((diff * diff) + self.eps))
-        return loss
+        return torch.mean(torch.sqrt((diff * diff) + self.eps))
 
 
 
@@ -231,8 +234,7 @@ def r1_penalty(real_pred, real_img):
         """
     grad_real = autograd.grad(
         outputs=real_pred.sum(), inputs=real_img, create_graph=True)[0]
-    grad_penalty = grad_real.pow(2).view(grad_real.shape[0], -1).sum(1).mean()
-    return grad_penalty
+    return grad_real.pow(2).view(grad_real.shape[0], -1).sum(1).mean()
 
 
 def g_path_regularize(fake_img, latents, mean_path_length, decay=0.01):

@@ -36,11 +36,12 @@ def main():
         print(f'loading model from {args.model_path}')
     else:
         os.makedirs(os.path.dirname(args.model_path), exist_ok=True)
-        url = 'https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/{}'.format(os.path.basename(args.model_path))
+        url = f'https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/{os.path.basename(args.model_path)}'
+
         r = requests.get(url, allow_redirects=True)
         print(f'downloading model {args.model_path}')
         open(args.model_path, 'wb').write(r.content)
-        
+
     model = define_model(args)
     model.eval()
     model = model.to(device)
@@ -129,54 +130,66 @@ def define_model(args):
                     mlp_ratio=2, upsampler='pixelshuffle', resi_connection='1conv')
         param_key_g = 'params'
 
-    # 002 lightweight image sr
-    # use 'pixelshuffledirect' to save parameters
     elif args.task == 'lightweight_sr':
         model = net(upscale=args.scale, in_chans=3, img_size=64, window_size=8,
                     img_range=1., depths=[6, 6, 6, 6], embed_dim=60, num_heads=[6, 6, 6, 6],
                     mlp_ratio=2, upsampler='pixelshuffledirect', resi_connection='1conv')
         param_key_g = 'params'
 
-    # 003 real-world image sr
     elif args.task == 'real_sr':
-        if not args.large_model:
-            # use 'nearest+conv' to avoid block artifacts
-            model = net(upscale=4, in_chans=3, img_size=64, window_size=8,
-                        img_range=1., depths=[6, 6, 6, 6, 6, 6], embed_dim=180, num_heads=[6, 6, 6, 6, 6, 6],
-                        mlp_ratio=2, upsampler='nearest+conv', resi_connection='1conv')
-        else:
-            # larger model size; use '3conv' to save parameters and memory; use ema for GAN training
-            model = net(upscale=4, in_chans=3, img_size=64, window_size=8,
-                        img_range=1., depths=[6, 6, 6, 6, 6, 6, 6, 6, 6], embed_dim=240,
-                        num_heads=[8, 8, 8, 8, 8, 8, 8, 8, 8],
-                        mlp_ratio=2, upsampler='nearest+conv', resi_connection='3conv')
+        model = (
+            net(
+                upscale=4,
+                in_chans=3,
+                img_size=64,
+                window_size=8,
+                img_range=1.0,
+                depths=[6, 6, 6, 6, 6, 6, 6, 6, 6],
+                embed_dim=240,
+                num_heads=[8, 8, 8, 8, 8, 8, 8, 8, 8],
+                mlp_ratio=2,
+                upsampler='nearest+conv',
+                resi_connection='3conv',
+            )
+            if args.large_model
+            else net(
+                upscale=4,
+                in_chans=3,
+                img_size=64,
+                window_size=8,
+                img_range=1.0,
+                depths=[6, 6, 6, 6, 6, 6],
+                embed_dim=180,
+                num_heads=[6, 6, 6, 6, 6, 6],
+                mlp_ratio=2,
+                upsampler='nearest+conv',
+                resi_connection='1conv',
+            )
+        )
+
         param_key_g = 'params_ema'
 
-    # 004 grayscale image denoising
     elif args.task == 'gray_dn':
         model = net(upscale=1, in_chans=1, img_size=128, window_size=8,
                     img_range=1., depths=[6, 6, 6, 6, 6, 6], embed_dim=180, num_heads=[6, 6, 6, 6, 6, 6],
                     mlp_ratio=2, upsampler='', resi_connection='1conv')
         param_key_g = 'params'
 
-    # 005 color image denoising
     elif args.task == 'color_dn':
         model = net(upscale=1, in_chans=3, img_size=128, window_size=8,
                     img_range=1., depths=[6, 6, 6, 6, 6, 6], embed_dim=180, num_heads=[6, 6, 6, 6, 6, 6],
                     mlp_ratio=2, upsampler='', resi_connection='1conv')
         param_key_g = 'params'
 
-    # 006 JPEG compression artifact reduction
-    # use window_size=7 because JPEG encoding uses 8x8; use img_range=255 because it's sligtly better than 1
     elif args.task == 'jpeg_car':
         model = net(upscale=1, in_chans=1, img_size=126, window_size=7,
                     img_range=255., depths=[6, 6, 6, 6, 6, 6], embed_dim=180, num_heads=[6, 6, 6, 6, 6, 6],
                     mlp_ratio=2, upsampler='', resi_connection='1conv')
         param_key_g = 'params'
-    
+
     pretrained_model = torch.load(args.model_path)
     model.load_state_dict(pretrained_model[param_key_g] if param_key_g in pretrained_model.keys() else pretrained_model, strict=True)
-        
+
     return model
 
 
@@ -256,32 +269,29 @@ def get_image_pair(args, path):
 def test(img_lq, model, args, window_size):
     if args.tile is None:
         # test the image as a whole
-        output = model(img_lq)
-    else:
-        # test the image tile by tile
-        b, c, h, w = img_lq.size()
-        tile = min(args.tile, h, w)
-        assert tile % window_size == 0, "tile size should be a multiple of window_size"
-        tile_overlap = args.tile_overlap
-        sf = args.scale
+        return model(img_lq)
+    # test the image tile by tile
+    b, c, h, w = img_lq.size()
+    tile = min(args.tile, h, w)
+    assert tile % window_size == 0, "tile size should be a multiple of window_size"
+    tile_overlap = args.tile_overlap
+    sf = args.scale
 
-        stride = tile - tile_overlap
-        h_idx_list = list(range(0, h-tile, stride)) + [h-tile]
-        w_idx_list = list(range(0, w-tile, stride)) + [w-tile]
-        E = torch.zeros(b, c, h*sf, w*sf).type_as(img_lq)
-        W = torch.zeros_like(E)
+    stride = tile - tile_overlap
+    h_idx_list = list(range(0, h-tile, stride)) + [h-tile]
+    w_idx_list = list(range(0, w-tile, stride)) + [w-tile]
+    E = torch.zeros(b, c, h*sf, w*sf).type_as(img_lq)
+    W = torch.zeros_like(E)
 
-        for h_idx in h_idx_list:
-            for w_idx in w_idx_list:
-                in_patch = img_lq[..., h_idx:h_idx+tile, w_idx:w_idx+tile]
-                out_patch = model(in_patch)
-                out_patch_mask = torch.ones_like(out_patch)
+    for h_idx in h_idx_list:
+        for w_idx in w_idx_list:
+            in_patch = img_lq[..., h_idx:h_idx+tile, w_idx:w_idx+tile]
+            out_patch = model(in_patch)
+            out_patch_mask = torch.ones_like(out_patch)
 
-                E[..., h_idx*sf:(h_idx+tile)*sf, w_idx*sf:(w_idx+tile)*sf].add_(out_patch)
-                W[..., h_idx*sf:(h_idx+tile)*sf, w_idx*sf:(w_idx+tile)*sf].add_(out_patch_mask)
-        output = E.div_(W)
-
-    return output
+            E[..., h_idx*sf:(h_idx+tile)*sf, w_idx*sf:(w_idx+tile)*sf].add_(out_patch)
+            W[..., h_idx*sf:(h_idx+tile)*sf, w_idx*sf:(w_idx+tile)*sf].add_(out_patch_mask)
+    return E.div_(W)
 
 if __name__ == '__main__':
     main()

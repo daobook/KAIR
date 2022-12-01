@@ -160,8 +160,12 @@ if __name__=='__main__':
             # do the enhancement
             img_H, orig_faces, enhanced_faces = enhancer.process(img_L)
 
-            util.imsave(np.hstack((img_L, img_H)), os.path.join(outdir, img_name+'_comparison.png'))
-            util.imsave(img_H, os.path.join(outdir, img_name+'_enhanced.png'))
+            util.imsave(
+                np.hstack((img_L, img_H)),
+                os.path.join(outdir, f'{img_name}_comparison.png'),
+            )
+
+            util.imsave(img_H, os.path.join(outdir, f'{img_name}_enhanced.png'))
             for m, (ef, of) in enumerate(zip(enhanced_faces, orig_faces)):
                 of = cv2.resize(of, ef.shape[:2])
                 util.imsave(np.hstack((of, ef)), os.path.join(outdir, img_name+'_face%02d'%m+'.png'))
@@ -169,4 +173,9 @@ if __name__=='__main__':
             # do the enhancement
             img_H = enhancer.process(img_L)
 
-            util.imsave(img_H, os.path.join(outdir, img_name+'_enhanced_without_detection.png'))
+            util.imsave(
+                img_H,
+                os.path.join(
+                    outdir, f'{img_name}_enhanced_without_detection.png'
+                ),
+            )

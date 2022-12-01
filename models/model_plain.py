@@ -53,8 +53,8 @@ class ModelPlain(ModelBase):
         if load_path_G is not None:
             print('Loading model for G [{:s}] ...'.format(load_path_G))
             self.load_network(load_path_G, self.netG, strict=self.opt_train['G_param_strict'], param_key='params')
-        load_path_E = self.opt['path']['pretrained_netE']
         if self.opt_train['E_decay'] > 0:
+            load_path_E = self.opt['path']['pretrained_netE']
             if load_path_E is not None:
                 print('Loading model for E [{:s}] ...'.format(load_path_E))
                 self.load_network(load_path_E, self.netE, strict=self.opt_train['E_param_strict'], param_key='params_ema')
@@ -170,7 +170,7 @@ class ModelPlain(ModelBase):
         # clip_grad
         # ------------------------------------
         # `clip_grad_norm` helps prevent the exploding gradient problem.
-        G_optimizer_clipgrad = self.opt_train['G_optimizer_clipgrad'] if self.opt_train['G_optimizer_clipgrad'] else 0
+        G_optimizer_clipgrad = self.opt_train['G_optimizer_clipgrad'] or 0
         if G_optimizer_clipgrad > 0:
             torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=self.opt_train['G_optimizer_clipgrad'], norm_type=2)
 
@@ -179,10 +179,10 @@ class ModelPlain(ModelBase):
         # ------------------------------------
         # regularizer
         # ------------------------------------
-        G_regularizer_orthstep = self.opt_train['G_regularizer_orthstep'] if self.opt_train['G_regularizer_orthstep'] else 0
+        G_regularizer_orthstep = self.opt_train['G_regularizer_orthstep'] or 0
         if G_regularizer_orthstep > 0 and current_step % G_regularizer_orthstep == 0 and current_step % self.opt['train']['checkpoint_save'] != 0:
             self.netG.apply(regularizer_orth)
-        G_regularizer_clipstep = self.opt_train['G_regularizer_clipstep'] if self.opt_train['G_regularizer_clipstep'] else 0
+        G_regularizer_clipstep = self.opt_train['G_regularizer_clipstep'] or 0
         if G_regularizer_clipstep > 0 and current_step % G_regularizer_clipstep == 0 and current_step % self.opt['train']['checkpoint_save'] != 0:
             self.netG.apply(regularizer_clip)
 
@@ -262,12 +262,10 @@ class ModelPlain(ModelBase):
     # network information
     # ----------------------------------------
     def info_network(self):
-        msg = self.describe_network(self.netG)
-        return msg
+        return self.describe_network(self.netG)
 
     # ----------------------------------------
     # params information
     # ----------------------------------------
     def info_params(self):
-        msg = self.describe_params(self.netG)
-        return msg
+        return self.describe_params(self.netG)

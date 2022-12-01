@@ -21,11 +21,11 @@ class DatasetPlainPatch(data.Dataset):
         super(DatasetPlainPatch, self).__init__()
         print('Get L/H for image-to-image mapping. Both "paths_L" and "paths_H" are needed.')
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
-        self.patch_size = self.opt['H_size'] if self.opt['H_size'] else 64
+        self.n_channels = opt['n_channels'] or 3
+        self.patch_size = self.opt['H_size'] or 64
 
-        self.num_patches_per_image = opt['num_patches_per_image'] if opt['num_patches_per_image'] else 40
-        self.num_sampled = opt['num_sampled'] if opt['num_sampled'] else 3000
+        self.num_patches_per_image = opt['num_patches_per_image'] or 40
+        self.num_sampled = opt['num_sampled'] or 3000
 
         # -------------------
         # get the path of L/H
@@ -36,7 +36,10 @@ class DatasetPlainPatch(data.Dataset):
         assert self.paths_H, 'Error: H path is empty.'
         assert self.paths_L, 'Error: L path is empty. This dataset uses L path, you can use dataset_dnpatchh'
         if self.paths_L and self.paths_H:
-            assert len(self.paths_L) == len(self.paths_H), 'H and L datasets have different number of images - {}, {}.'.format(len(self.paths_L), len(self.paths_H))
+            assert len(self.paths_L) == len(
+                self.paths_H
+            ), f'H and L datasets have different number of images - {len(self.paths_L)}, {len(self.paths_H)}.'
+
 
         # ------------------------------------
         # number of sampled images
@@ -62,7 +65,7 @@ class DatasetPlainPatch(data.Dataset):
         # update whole L/H patches
         # ------------------------------------
         """
-        self.index_sampled = random.sample(range(0, len(self.paths_H), 1), self.num_sampled)
+        self.index_sampled = random.sample(range(len(self.paths_H)), self.num_sampled)
         n_count = 0
 
         for i in range(len(self.index_sampled)):
@@ -113,15 +116,13 @@ class DatasetPlainPatch(data.Dataset):
             patch_L = util.augment_img(patch_L, mode=mode)
             patch_H = util.augment_img(patch_H, mode=mode)
 
-            patch_L, patch_H = util.uint2tensor3(patch_L), util.uint2tensor3(patch_H)
-
         else:
 
             L_path, H_path = self.paths_L[index], self.paths_H[index]
             patch_L = util.imread_uint(L_path, self.n_channels)
             patch_H = util.imread_uint(H_path, self.n_channels)
 
-            patch_L, patch_H = util.uint2tensor3(patch_L), util.uint2tensor3(patch_H)
+        patch_L, patch_H = util.uint2tensor3(patch_L), util.uint2tensor3(patch_H)
 
         return {'L': patch_L, 'H': patch_H}
 

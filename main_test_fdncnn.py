@@ -68,7 +68,6 @@ def main():
     noise_level_model = noise_level_img  # noise level for model
     model_name = 'fdncnn_gray'           # 'fdncnn_gray' | 'fdncnn_color' | 'fdncnn_color_clip' | 'fdncnn_gray_clip'
     testset_name = 'bsd68'               # test set,  'bsd68' | 'cbsd68' | 'set12'
-    need_degradation = True              # default: True
     x8 = False                           # default: False, x8 to boost performance
     show_img = False                     # default: Falsedefault: False
 
@@ -77,20 +76,14 @@ def main():
 
     task_current = 'dn'       # 'dn' for denoising | 'sr' for super-resolution
     sf = 1                    # unused for denoising
-    if 'color' in model_name:
-        n_channels = 3        # 3 for color image
-    else:
-        n_channels = 1        # 1 for grayscale image
-    if 'clip' in model_name:
-        use_clip = True       # clip the intensities into range of [0, 1]
-    else:
-        use_clip = False
+    n_channels = 3 if 'color' in model_name else 1
+    use_clip = 'clip' in model_name
     model_pool = 'model_zoo'  # fixed
     testsets = 'testsets'     # fixed
     results = 'results'       # fixed
-    result_name = testset_name + '_' + model_name
+    result_name = f'{testset_name}_{model_name}'
     border = sf if task_current == 'sr' else 0     # shave boader to calculate PSNR and SSIM
-    model_path = os.path.join(model_pool, model_name+'.pth')
+    model_path = os.path.join(model_pool, f'{model_name}.pth')
 
     # ----------------------------------------
     # L_path, E_path, H_path
@@ -101,13 +94,15 @@ def main():
     E_path = os.path.join(results, result_name)   # E_path, for Estimated images
     util.mkdir(E_path)
 
-    if H_path == L_path:
-        need_degradation = True
+    need_degradation = True
     logger_name = result_name
-    utils_logger.logger_info(logger_name, log_path=os.path.join(E_path, logger_name+'.log'))
+    utils_logger.logger_info(
+        logger_name, log_path=os.path.join(E_path, f'{logger_name}.log')
+    )
+
     logger = logging.getLogger(logger_name)
 
-    need_H = True if H_path is not None else False
+    need_H = H_path is not None
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # ----------------------------------------
@@ -123,13 +118,16 @@ def main():
     model = model.to(device)
     logger.info('Model path: {:s}'.format(model_path))
     number_parameters = sum(map(lambda x: x.numel(), model.parameters()))
-    logger.info('Params number: {}'.format(number_parameters))
+    logger.info(f'Params number: {number_parameters}')
 
     test_results = OrderedDict()
     test_results['psnr'] = []
     test_results['ssim'] = []
 
-    logger.info('model_name:{}, model sigma:{}, image sigma:{}'.format(model_name, noise_level_img, noise_level_model))
+    logger.info(
+        f'model_name:{model_name}, model sigma:{noise_level_img}, image sigma:{noise_level_model}'
+    )
+
     logger.info(L_path)
     L_paths = util.get_image_paths(L_path)
     H_paths = util.get_image_paths(H_path) if need_H else None
@@ -151,7 +149,11 @@ def main():
         if use_clip:
             img_L = util.uint2single(util.single2uint(img_L)) 
 
-        util.imshow(util.single2uint(img_L), title='Noisy image with noise level {}'.format(noise_level_img)) if show_img else None
+        util.imshow(
+            util.single2uint(img_L),
+            title=f'Noisy image with noise level {noise_level_img}',
+        ) if show_img else None
+
 
         img_L = util.single2tensor4(img_L)
         noise_level_map = torch.ones((1, 1, img_L.size(2), img_L.size(3)), dtype=torch.float).mul_(noise_level_model/255.)
@@ -162,11 +164,7 @@ def main():
         # (2) img_E
         # ------------------------------------
 
-        if not x8:
-            img_E = model(img_L)
-        else:
-            img_E = utils_model.test_mode(model, img_L, mode=3)
-
+        img_E = utils_model.test_mode(model, img_L, mode=3) if x8 else model(img_L)
         img_E = util.tensor2uint(img_E)
 
         if need_H:

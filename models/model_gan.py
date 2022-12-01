@@ -54,8 +54,8 @@ class ModelGAN(ModelBase):
         if load_path_G is not None:
             print('Loading model for G [{:s}] ...'.format(load_path_G))
             self.load_network(load_path_G, self.netG, strict=self.opt_train['G_param_strict'])
-        load_path_E = self.opt['path']['pretrained_netE']
         if self.opt_train['E_decay'] > 0:
+            load_path_E = self.opt['path']['pretrained_netE']
             if load_path_E is not None:
                 print('Loading model for E [{:s}] ...'.format(load_path_E))
                 self.load_network(load_path_E, self.netE, strict=self.opt_train['E_param_strict'])
@@ -145,8 +145,8 @@ class ModelGAN(ModelBase):
         self.D_lossfn = GANLoss(self.opt_train['gan_type'], 1.0, 0.0).to(self.device)
         self.D_lossfn_weight = self.opt_train['D_lossfn_weight']
 
-        self.D_update_ratio = self.opt_train['D_update_ratio'] if self.opt_train['D_update_ratio'] else 1
-        self.D_init_iters = self.opt_train['D_init_iters'] if self.opt_train['D_init_iters'] else 0
+        self.D_update_ratio = self.opt_train['D_update_ratio'] or 1
+        self.D_init_iters = self.opt_train['D_init_iters'] or 0
 
     # ----------------------------------------
     # define optimizer, G and D
@@ -348,6 +348,5 @@ class ModelGAN(ModelBase):
     # params information
     # ----------------------------------------
     def info_params(self):
-        msg = self.describe_params(self.netG)
-        return msg
+        return self.describe_params(self.netG)
 

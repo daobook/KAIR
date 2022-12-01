@@ -28,8 +28,7 @@ def sequential(*args):
     modules = []
     for module in args:
         if isinstance(module, nn.Sequential):
-            for submodule in module.children():
-                modules.append(submodule)
+            modules.extend(iter(module.children()))
         elif isinstance(module, nn.Module):
             modules.append(module)
     return nn.Sequential(*modules)
@@ -146,7 +145,7 @@ class PixelUnShuffle(nn.Module):
         return pixel_unshuffle(input, self.upscale_factor)
 
     def extra_repr(self):
-        return 'upscale_factor={}'.format(self.upscale_factor)
+        return f'upscale_factor={self.upscale_factor}'
 
 
 # --------------------------------------------
@@ -178,11 +177,10 @@ class ConcatBlock(nn.Module):
         self.sub = submodule
 
     def forward(self, x):
-        output = torch.cat((x, self.sub(x)), dim=1)
-        return output
+        return torch.cat((x, self.sub(x)), dim=1)
 
     def __repr__(self):
-        return self.sub.__repr__() + 'concat'
+        return f'{self.sub.__repr__()}concat'
 
 
 # --------------------------------------------
@@ -195,13 +193,12 @@ class ShortcutBlock(nn.Module):
         self.sub = submodule
 
     def forward(self, x):
-        output = x + self.sub(x)
-        return output
+        return x + self.sub(x)
 
     def __repr__(self):
         tmpstr = 'Identity + \n|'
         modstr = self.sub.__repr__().replace('\n', '\n|')
-        tmpstr = tmpstr + modstr
+        tmpstr += modstr
         return tmpstr
 
 
@@ -445,8 +442,16 @@ class RRDB(nn.Module):
 # --------------------------------------------
 def upsample_pixelshuffle(in_channels=64, out_channels=3, kernel_size=3, stride=1, padding=1, bias=True, mode='2R', negative_slope=0.2):
     assert len(mode)<4 and mode[0] in ['2', '3', '4'], 'mode examples: 2, 2R, 2BR, 3, ..., 4BR.'
-    up1 = conv(in_channels, out_channels * (int(mode[0]) ** 2), kernel_size, stride, padding, bias, mode='C'+mode, negative_slope=negative_slope)
-    return up1
+    return conv(
+        in_channels,
+        out_channels * (int(mode[0]) ** 2),
+        kernel_size,
+        stride,
+        padding,
+        bias,
+        mode=f'C{mode}',
+        negative_slope=negative_slope,
+    )
 
 
 # --------------------------------------------
@@ -461,8 +466,16 @@ def upsample_upconv(in_channels=64, out_channels=3, kernel_size=3, stride=1, pad
     elif mode[0] == '4':
         uc = 'vC'
     mode = mode.replace(mode[0], uc)
-    up1 = conv(in_channels, out_channels, kernel_size, stride, padding, bias, mode=mode, negative_slope=negative_slope)
-    return up1
+    return conv(
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride,
+        padding,
+        bias,
+        mode=mode,
+        negative_slope=negative_slope,
+    )
 
 
 # --------------------------------------------
@@ -473,8 +486,16 @@ def upsample_convtranspose(in_channels=64, out_channels=3, kernel_size=2, stride
     kernel_size = int(mode[0])
     stride = int(mode[0])
     mode = mode.replace(mode[0], 'T')
-    up1 = conv(in_channels, out_channels, kernel_size, stride, padding, bias, mode, negative_slope)
-    return up1
+    return conv(
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride,
+        padding,
+        bias,
+        mode,
+        negative_slope,
+    )
 
 
 '''
@@ -497,8 +518,16 @@ def downsample_strideconv(in_channels=64, out_channels=64, kernel_size=2, stride
     kernel_size = int(mode[0])
     stride = int(mode[0])
     mode = mode.replace(mode[0], 'C')
-    down1 = conv(in_channels, out_channels, kernel_size, stride, padding, bias, mode, negative_slope)
-    return down1
+    return conv(
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride,
+        padding,
+        bias,
+        mode,
+        negative_slope,
+    )
 
 
 # --------------------------------------------
@@ -547,7 +576,10 @@ class NonLocalBlock2D(nn.Module):
 
         inter_nc = nc // 2
         self.inter_nc = inter_nc
-        self.W = conv(inter_nc, nc, kernel_size, stride, padding, bias, mode='C'+act_mode)
+        self.W = conv(
+            inter_nc, nc, kernel_size, stride, padding, bias, mode=f'C{act_mode}'
+        )
+
         self.theta = conv(nc, inter_nc, kernel_size, stride, padding, bias, mode='C')
 
         if downsample:
@@ -586,6 +618,4 @@ class NonLocalBlock2D(nn.Module):
         y = y.permute(0, 2, 1).contiguous()
         y = y.view(batch_size, self.inter_nc, *x.size()[2:])
         W_y = self.W(y)
-        z = W_y + x
-
-        return z
+        return W_y + x

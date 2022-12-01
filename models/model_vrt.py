@@ -35,7 +35,7 @@ class ModelVRT(ModelPlain):
                 normal_params = []
                 flow_params = []
                 for name, param in self.netG.named_parameters():
-                    if any([key in name for key in self.fix_keys]):
+                    if any(key in name for key in self.fix_keys):
                         flow_params.append(param)
                     else:
                         normal_params.append(param)
@@ -68,7 +68,7 @@ class ModelVRT(ModelPlain):
                 print(f'Fix keys: {self.fix_keys} for the first {self.fix_iter} iters.')
                 self.fix_unflagged = False
                 for name, param in self.netG.named_parameters():
-                    if any([key in name for key in self.fix_keys]):
+                    if any(key in name for key in self.fix_keys):
                         param.requires_grad_(False)
             elif current_step == self.fix_iter:
                 print(f'Train all the parameters from {self.fix_iter} iters.')
@@ -114,9 +114,7 @@ class ModelVRT(ModelPlain):
     def _test_video(self, lq):
         '''test the video as a whole or as clips (divided temporally). '''
 
-        num_frame_testing = self.opt['val'].get('num_frame_testing', 0)
-
-        if num_frame_testing:
+        if num_frame_testing := self.opt['val'].get('num_frame_testing', 0):
             # test as multiple clips if out-of-memory
             sf = self.opt['scale']
             num_frame_overlapping = self.opt['val'].get('num_frame_overlapping', 2)
@@ -254,5 +252,5 @@ class ModelVRT(ModelPlain):
                 if crt_net[k].size() != load_net[k].size():
                     print(f'Size different, ignore [{k}]: crt_net: '
                                    f'{crt_net[k].shape}; load_net: {load_net[k].shape}')
-                    load_net[k + '.ignore'] = load_net.pop(k)
+                    load_net[f'{k}.ignore'] = load_net.pop(k)
 

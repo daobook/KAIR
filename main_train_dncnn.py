@@ -82,7 +82,10 @@ def main(json_path='options/train_dncnn.json'):
     # configure logger
     # ----------------------------------------
     logger_name = 'train'
-    utils_logger.logger_info(logger_name, os.path.join(opt['path']['log'], logger_name+'.log'))
+    utils_logger.logger_info(
+        logger_name, os.path.join(opt['path']['log'], f'{logger_name}.log')
+    )
+
     logger = logging.getLogger(logger_name)
     logger.info(option.dict2str(opt))
 
@@ -92,7 +95,7 @@ def main(json_path='options/train_dncnn.json'):
     seed = opt['train']['manual_seed']
     if seed is None:
         seed = random.randint(1, 10000)
-    logger.info('Random seed: {}'.format(seed))
+    logger.info(f'Random seed: {seed}')
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -126,7 +129,7 @@ def main(json_path='options/train_dncnn.json'):
                                      shuffle=False, num_workers=1,
                                      drop_last=False, pin_memory=True)
         else:
-            raise NotImplementedError("Phase [%s] is not recognized." % phase)
+            raise NotImplementedError(f"Phase [{phase}] is not recognized.")
 
     '''
     # ----------------------------------------
