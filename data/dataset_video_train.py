@@ -410,7 +410,6 @@ class VideoRecurrentTrainVimeoVFIDataset(VideoRecurrentTrainVimeoDataset):
 
         # get the neighboring LQ and  GT frames
         img_lqs = []
-        img_gts = []
         for neighbor in self.neighbor_list:
             if self.is_lmdb:
                 img_lq_path = f'{clip}/{seq}/im{neighbor}'
@@ -429,8 +428,7 @@ class VideoRecurrentTrainVimeoVFIDataset(VideoRecurrentTrainVimeoDataset):
 
         img_bytes = self.file_client.get(img_gt_path, 'gt')
         img_gt = utils_video.imfrombytes(img_bytes, float32=True)
-        img_gts.append(img_gt)
-
+        img_gts = [img_gt]
         # randomly crop
         img_gts, img_lqs = utils_video.paired_random_crop(img_gts, img_lqs, gt_size, scale, img_gt_path)
 

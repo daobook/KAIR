@@ -17,9 +17,9 @@ class DatasetSR(data.Dataset):
     def __init__(self, opt):
         super(DatasetSR, self).__init__()
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
-        self.sf = opt['scale'] if opt['scale'] else 4
-        self.patch_size = self.opt['H_size'] if self.opt['H_size'] else 96
+        self.n_channels = opt['n_channels'] or 3
+        self.sf = opt['scale'] or 4
+        self.patch_size = self.opt['H_size'] or 96
         self.L_size = self.patch_size // self.sf
 
         # ------------------------------------
@@ -30,7 +30,9 @@ class DatasetSR(data.Dataset):
 
         assert self.paths_H, 'Error: H path is empty.'
         if self.paths_L and self.paths_H:
-            assert len(self.paths_L) == len(self.paths_H), 'L/H mismatch - {}, {}.'.format(len(self.paths_L), len(self.paths_H))
+            assert len(self.paths_L) == len(
+                self.paths_H
+            ), f'L/H mismatch - {len(self.paths_L)}, {len(self.paths_H)}.'
 
     def __getitem__(self, index):
 

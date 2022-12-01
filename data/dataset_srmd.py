@@ -23,13 +23,13 @@ class DatasetSRMD(data.Dataset):
     def __init__(self, opt):
         super(DatasetSRMD, self).__init__()
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
-        self.sf = opt['scale'] if opt['scale'] else 4
-        self.patch_size = self.opt['H_size'] if self.opt['H_size'] else 96
+        self.n_channels = opt['n_channels'] or 3
+        self.sf = opt['scale'] or 4
+        self.patch_size = self.opt['H_size'] or 96
         self.L_size = self.patch_size // self.sf
-        self.sigma = opt['sigma'] if opt['sigma'] else [0, 50]
+        self.sigma = opt['sigma'] or [0, 50]
         self.sigma_min, self.sigma_max = self.sigma[0], self.sigma[1]
-        self.sigma_test = opt['sigma_test'] if opt['sigma_test'] else 0
+        self.sigma_test = opt['sigma_test'] or 0
 
         # -------------------------------------
         # PCA projection matrix
@@ -122,7 +122,7 @@ class DatasetSRMD(data.Dataset):
                 noise_level = torch.FloatTensor([np.random.uniform(self.sigma_min, self.sigma_max)])/255.0
                 # noise_level = torch.rand(1)*50/255.0
                 # noise_level = torch.min(torch.from_numpy(np.float32([7*np.random.chisquare(2.5)/255.0])),torch.Tensor([50./255.]))
-    
+
         else:
 
             img_H, img_L = util.single2tensor3(img_H), util.single2tensor3(img_L)
@@ -149,7 +149,7 @@ class DatasetSRMD(data.Dataset):
         img_L = torch.cat((img_L, M), 0)
         L_path = H_path
 
-        return {'L': img_L, 'H': img_H, 'L_path': L_path, 'H_path': H_path}
+        return {'L': img_L, 'H': img_H, 'L_path': L_path, 'H_path': L_path}
 
     def __len__(self):
         return len(self.paths_H)

@@ -67,23 +67,21 @@ def main():
     noise_level_model = noise_level_img  # noise level for model    
     model_name = 'dpsr_x4_gan'           # 'dpsr_x2' | 'dpsr_x3' | 'dpsr_x4' | 'dpsr_x4_gan'
     testset_name = 'set5'                # test set,  'set5' | 'srbsd68'
-    need_degradation = True              # default: True
     x8 = False                           # default: False, x8 to boost performance
     sf = [int(s) for s in re.findall(r'\d+', model_name)][0]  # scale factor
     show_img = False                     # default: False
 
 
 
-    task_current = 'sr'       # 'dn' for denoising | 'sr' for super-resolution
     n_channels = 3            # fixed
     nc = 96                   # fixed, number of channels
     nb = 16                   # fixed, number of conv layers
     model_pool = 'model_zoo'  # fixed
     testsets = 'testsets'     # fixed
     results = 'results'       # fixed
-    result_name = testset_name + '_' + model_name
-    border = sf if task_current == 'sr' else 0     # shave boader to calculate PSNR and SSIM
-    model_path = os.path.join(model_pool, model_name+'.pth')
+    result_name = f'{testset_name}_{model_name}'
+    border = sf if True else 0
+    model_path = os.path.join(model_pool, f'{model_name}.pth')
 
     # ----------------------------------------
     # L_path, E_path, H_path
@@ -94,13 +92,15 @@ def main():
     E_path = os.path.join(results, result_name)   # E_path, for Estimated images
     util.mkdir(E_path)
 
-    if H_path == L_path:
-        need_degradation = True
+    need_degradation = True
     logger_name = result_name
-    utils_logger.logger_info(logger_name, log_path=os.path.join(E_path, logger_name+'.log'))
+    utils_logger.logger_info(
+        logger_name, log_path=os.path.join(E_path, f'{logger_name}.log')
+    )
+
     logger = logging.getLogger(logger_name)
 
-    need_H = True if H_path is not None else False
+    need_H = H_path is not None
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # ----------------------------------------
@@ -116,7 +116,7 @@ def main():
     model = model.to(device)
     logger.info('Model path: {:s}'.format(model_path))
     number_parameters = sum(map(lambda x: x.numel(), model.parameters()))
-    logger.info('Params number: {}'.format(number_parameters))
+    logger.info(f'Params number: {number_parameters}')
 
     test_results = OrderedDict()
     test_results['psnr'] = []
@@ -124,7 +124,10 @@ def main():
     test_results['psnr_y'] = []
     test_results['ssim_y'] = []
 
-    logger.info('model_name:{}, model sigma:{}, image sigma:{}'.format(model_name, noise_level_img, noise_level_model))
+    logger.info(
+        f'model_name:{model_name}, model sigma:{noise_level_img}, image sigma:{noise_level_model}'
+    )
+
     logger.info(L_path)
     L_paths = util.get_image_paths(L_path)
     H_paths = util.get_image_paths(H_path) if need_H else None
@@ -147,7 +150,11 @@ def main():
             np.random.seed(seed=0)  # for reproducibility
             img_L += np.random.normal(0, noise_level_img/255., img_L.shape)
 
-        util.imshow(util.single2uint(img_L), title='LR image with noise level {}'.format(noise_level_img)) if show_img else None
+        util.imshow(
+            util.single2uint(img_L),
+            title=f'LR image with noise level {noise_level_img}',
+        ) if show_img else None
+
 
         img_L = util.single2tensor4(img_L)
         noise_level_map = torch.full((1, 1, img_L.size(2), img_L.size(3)), noise_level_model/255.).type_as(img_L)
@@ -158,10 +165,11 @@ def main():
         # (2) img_E
         # ------------------------------------
 
-        if not x8:
-            img_E = model(img_L)
-        else:
-            img_E = utils_model.test_mode(model, img_L, mode=3, sf=sf)
+        img_E = (
+            utils_model.test_mode(model, img_L, mode=3, sf=sf)
+            if x8
+            else model(img_L)
+        )
 
         img_E = util.tensor2uint(img_E)
 
@@ -198,7 +206,7 @@ def main():
         # save results
         # ------------------------------------
 
-        util.imsave(img_E, os.path.join(E_path, img_name+'.png'))
+        util.imsave(img_E, os.path.join(E_path, f'{img_name}.png'))
 
     if need_H:
         ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])

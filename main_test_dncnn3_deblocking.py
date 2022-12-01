@@ -69,15 +69,18 @@ def main():
     x8 = False                       # default: False, x8 to boost performance
     testsets = 'testsets'     # fixed
     results = 'results'       # fixed
-    result_name = testset_name + '_' + model_name # fixed
+    result_name = f'{testset_name}_{model_name}'
     L_path = os.path.join(testsets, testset_name) # L_path, for Low-quality grayscale/Y-channel JPEG images
     E_path = os.path.join(results, result_name)   # E_path, for Estimated images
     util.mkdir(E_path)
 
     model_pool = 'model_zoo'  # fixed
-    model_path = os.path.join(model_pool, model_name+'.pth')
+    model_path = os.path.join(model_pool, f'{model_name}.pth')
     logger_name = result_name
-    utils_logger.logger_info(logger_name, log_path=os.path.join(E_path, logger_name+'.log'))
+    utils_logger.logger_info(
+        logger_name, log_path=os.path.join(E_path, f'{logger_name}.log')
+    )
+
     logger = logging.getLogger(logger_name)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -95,7 +98,7 @@ def main():
     model = model.to(device)
     logger.info('Model path: {:s}'.format(model_path))
     number_parameters = sum(map(lambda x: x.numel(), model.parameters()))
-    logger.info('Params number: {}'.format(number_parameters))
+    logger.info(f'Params number: {number_parameters}')
 
     logger.info(L_path)
     L_paths = util.get_image_paths(L_path)
@@ -118,11 +121,7 @@ def main():
         # ------------------------------------
         # (2) img_E
         # ------------------------------------
-        if not x8:
-            img_E = model(img_L)
-        else:
-            img_E = utils_model.test_mode(model, img_L, mode=3)
-
+        img_E = utils_model.test_mode(model, img_L, mode=3) if x8 else model(img_L)
         img_E = util.tensor2single(img_E)
         if n_channels == 3:
             ycbcr[..., 0] = img_E
@@ -132,7 +131,7 @@ def main():
         # ------------------------------------
         # save results
         # ------------------------------------
-        util.imsave(img_E, os.path.join(E_path, img_name+'.png'))
+        util.imsave(img_E, os.path.join(E_path, f'{img_name}.png'))
 
 
 if __name__ == '__main__':

@@ -55,13 +55,16 @@ def download_pretrained_model(model_dir='model_zoo', model_name='dncnn3.pth'):
     else:
         os.makedirs(model_dir, exist_ok=True)
         if 'SwinIR' in model_name:
-            url = 'https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/{}'.format(model_name)
+            url = f'https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/{model_name}'
+
         elif '_VRT_' in model_name:
-            url = 'https://github.com/JingyunLiang/VRT/releases/download/v0.0/{}'.format(model_name)
+            url = f'https://github.com/JingyunLiang/VRT/releases/download/v0.0/{model_name}'
+
         elif '_RVRT_' in model_name:
-            url = 'https://github.com/JingyunLiang/RVRT/releases/download/v0.0/{}'.format(model_name)
+            url = f'https://github.com/JingyunLiang/RVRT/releases/download/v0.0/{model_name}'
+
         else:
-            url = 'https://github.com/cszn/KAIR/releases/download/v1.0/{}'.format(model_name)
+            url = f'https://github.com/cszn/KAIR/releases/download/v1.0/{model_name}'
         r = requests.get(url, allow_redirects=True)
         print(f'downloading [{model_dir}/{model_name}] ...')
         open(os.path.join(model_dir, model_name), 'wb').write(r.content)

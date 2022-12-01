@@ -23,8 +23,8 @@ class DatasetUSRNet(data.Dataset):
     def __init__(self, opt):
         super(DatasetUSRNet, self).__init__()
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
-        self.patch_size = self.opt['H_size'] if self.opt['H_size'] else 96
+        self.n_channels = opt['n_channels'] or 3
+        self.patch_size = self.opt['H_size'] or 96
         self.sigma_max = self.opt['sigma_max'] if self.opt['sigma_max'] is not None else 25
         self.scales = opt['scales'] if opt['scales'] is not None else [1,2,3,4]
         self.sf_validation = opt['sf_validation'] if opt['sf_validation'] is not None else 3

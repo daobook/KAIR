@@ -99,10 +99,11 @@ class VideoRecurrentTestDataset(data.Dataset):
 
         if self.sigma:
         # for non-blind video denoising
-            if self.cache_data:
-                imgs_gt = self.imgs_gt[folder]
-            else:
-                imgs_gt = utils_video.read_img_seq(self.imgs_gt[folder])
+            imgs_gt = (
+                self.imgs_gt[folder]
+                if self.cache_data
+                else utils_video.read_img_seq(self.imgs_gt[folder])
+            )
 
             torch.manual_seed(0)
             noise_level = torch.ones((1, 1, 1, 1)) * self.sigma
@@ -110,14 +111,12 @@ class VideoRecurrentTestDataset(data.Dataset):
             imgs_lq = imgs_gt + noise
             t, _, h, w = imgs_lq.shape
             imgs_lq = torch.cat([imgs_lq, noise_level.expand(t, 1, h, w)], 1)
+        elif self.cache_data:
+            imgs_lq = self.imgs_lq[folder]
+            imgs_gt = self.imgs_gt[folder]
         else:
-        # for video sr and deblurring
-            if self.cache_data:
-                imgs_lq = self.imgs_lq[folder]
-                imgs_gt = self.imgs_gt[folder]
-            else:
-                imgs_lq = utils_video.read_img_seq(self.imgs_lq[folder])
-                imgs_gt = utils_video.read_img_seq(self.imgs_gt[folder])
+            imgs_lq = utils_video.read_img_seq(self.imgs_lq[folder])
+            imgs_gt = utils_video.read_img_seq(self.imgs_gt[folder])
 
         return {
             'L': imgs_lq,

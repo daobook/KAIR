@@ -18,11 +18,11 @@ class DatasetFFDNet(data.Dataset):
     def __init__(self, opt):
         super(DatasetFFDNet, self).__init__()
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
+        self.n_channels = opt['n_channels'] or 3
         self.patch_size = self.opt['H_size'] if opt['H_size'] else 64
-        self.sigma = opt['sigma'] if opt['sigma'] else [0, 75]
+        self.sigma = opt['sigma'] or [0, 75]
         self.sigma_min, self.sigma_max = self.sigma[0], self.sigma[1]
-        self.sigma_test = opt['sigma_test'] if opt['sigma_test'] else 25
+        self.sigma_test = opt['sigma_test'] or 25
 
         # -------------------------------------
         # get the path of H, return None if input is None

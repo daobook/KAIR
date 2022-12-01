@@ -238,7 +238,8 @@ def prepare_model_dataset(args):
         print(f'loading model from ./model_zoo/vrt/{model_path}')
     else:
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        url = 'https://github.com/JingyunLiang/VRT/releases/download/v0.0/{}'.format(os.path.basename(model_path))
+        url = f'https://github.com/JingyunLiang/VRT/releases/download/v0.0/{os.path.basename(model_path)}'
+
         r = requests.get(url, allow_redirects=True)
         print(f'downloading model {model_path}')
         open(model_path, 'wb').write(r.content)
@@ -249,64 +250,62 @@ def prepare_model_dataset(args):
     # download datasets
     if os.path.exists(f'{args.folder_lq}'):
         print(f'using dataset from {args.folder_lq}')
+    elif 'vimeo' in args.folder_lq.lower():
+        print(f'Vimeo dataset is not at {args.folder_lq}! Please refer to #training of Readme.md to download it.')
     else:
-        if 'vimeo' in args.folder_lq.lower():
-            print(f'Vimeo dataset is not at {args.folder_lq}! Please refer to #training of Readme.md to download it.')
-        else:
-            os.makedirs('testsets', exist_ok=True)
-            for dataset in datasets:
-                url = f'https://github.com/JingyunLiang/VRT/releases/download/v0.0/testset_{dataset}.tar.gz'
-                r = requests.get(url, allow_redirects=True)
-                print(f'downloading testing dataset {dataset}')
-                open(f'testsets/{dataset}.tar.gz', 'wb').write(r.content)
-                os.system(f'tar -xvf testsets/{dataset}.tar.gz -C testsets')
-                os.system(f'rm testsets/{dataset}.tar.gz')
+        os.makedirs('testsets', exist_ok=True)
+        for dataset in datasets:
+            url = f'https://github.com/JingyunLiang/VRT/releases/download/v0.0/testset_{dataset}.tar.gz'
+            r = requests.get(url, allow_redirects=True)
+            print(f'downloading testing dataset {dataset}')
+            open(f'testsets/{dataset}.tar.gz', 'wb').write(r.content)
+            os.system(f'tar -xvf testsets/{dataset}.tar.gz -C testsets')
+            os.system(f'rm testsets/{dataset}.tar.gz')
 
     return model
 
 
 def test_video(lq, model, args):
-        '''test the video as a whole or as clips (divided temporally). '''
+    '''test the video as a whole or as clips (divided temporally). '''
 
-        num_frame_testing = args.tile[0]
-        if num_frame_testing:
-            # test as multiple clips if out-of-memory
-            sf = args.scale
-            num_frame_overlapping = args.tile_overlap[0]
-            not_overlap_border = False
-            b, d, c, h, w = lq.size()
-            c = c - 1 if args.nonblind_denoising else c
-            stride = num_frame_testing - num_frame_overlapping
-            d_idx_list = list(range(0, d-num_frame_testing, stride)) + [max(0, d-num_frame_testing)]
-            E = torch.zeros(b, d, c, h*sf, w*sf)
-            W = torch.zeros(b, d, 1, 1, 1)
+    if num_frame_testing := args.tile[0]:
+        # test as multiple clips if out-of-memory
+        sf = args.scale
+        num_frame_overlapping = args.tile_overlap[0]
+        not_overlap_border = False
+        b, d, c, h, w = lq.size()
+        c = c - 1 if args.nonblind_denoising else c
+        stride = num_frame_testing - num_frame_overlapping
+        d_idx_list = list(range(0, d-num_frame_testing, stride)) + [max(0, d-num_frame_testing)]
+        E = torch.zeros(b, d, c, h*sf, w*sf)
+        W = torch.zeros(b, d, 1, 1, 1)
 
-            for d_idx in d_idx_list:
-                lq_clip = lq[:, d_idx:d_idx+num_frame_testing, ...]
-                out_clip = test_clip(lq_clip, model, args)
-                out_clip_mask = torch.ones((b, min(num_frame_testing, d), 1, 1, 1))
+        for d_idx in d_idx_list:
+            lq_clip = lq[:, d_idx:d_idx+num_frame_testing, ...]
+            out_clip = test_clip(lq_clip, model, args)
+            out_clip_mask = torch.ones((b, min(num_frame_testing, d), 1, 1, 1))
 
-                if not_overlap_border:
-                    if d_idx < d_idx_list[-1]:
-                        out_clip[:, -num_frame_overlapping//2:, ...] *= 0
-                        out_clip_mask[:, -num_frame_overlapping//2:, ...] *= 0
-                    if d_idx > d_idx_list[0]:
-                        out_clip[:, :num_frame_overlapping//2, ...] *= 0
-                        out_clip_mask[:, :num_frame_overlapping//2, ...] *= 0
+            if not_overlap_border:
+                if d_idx < d_idx_list[-1]:
+                    out_clip[:, -num_frame_overlapping//2:, ...] *= 0
+                    out_clip_mask[:, -num_frame_overlapping//2:, ...] *= 0
+                if d_idx > d_idx_list[0]:
+                    out_clip[:, :num_frame_overlapping//2, ...] *= 0
+                    out_clip_mask[:, :num_frame_overlapping//2, ...] *= 0
 
-                E[:, d_idx:d_idx+num_frame_testing, ...].add_(out_clip)
-                W[:, d_idx:d_idx+num_frame_testing, ...].add_(out_clip_mask)
-            output = E.div_(W)
-        else:
-            # test as one clip (the whole video) if you have enough memory
-            window_size = args.window_size
-            d_old = lq.size(1)
-            d_pad = (window_size[0] - d_old % window_size[0]) % window_size[0]
-            lq = torch.cat([lq, torch.flip(lq[:, -d_pad:, ...], [1])], 1) if d_pad else lq
-            output = test_clip(lq, model, args)
-            output = output[:, :d_old, :, :, :]
+            E[:, d_idx:d_idx+num_frame_testing, ...].add_(out_clip)
+            W[:, d_idx:d_idx+num_frame_testing, ...].add_(out_clip_mask)
+        output = E.div_(W)
+    else:
+        # test as one clip (the whole video) if you have enough memory
+        window_size = args.window_size
+        d_old = lq.size(1)
+        d_pad = (window_size[0] - d_old % window_size[0]) % window_size[0]
+        lq = torch.cat([lq, torch.flip(lq[:, -d_pad:, ...], [1])], 1) if d_pad else lq
+        output = test_clip(lq, model, args)
+        output = output[:, :d_old, :, :, :]
 
-        return output
+    return output
 
 
 def test_clip(lq, model, args):

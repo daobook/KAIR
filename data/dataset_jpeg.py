@@ -9,12 +9,12 @@ class DatasetJPEG(data.Dataset):
         super(DatasetJPEG, self).__init__()
         print('Dataset: JPEG compression artifact reduction (deblocking) with quality factor. Only dataroot_H is needed.')
         self.opt = opt
-        self.n_channels = opt['n_channels'] if opt['n_channels'] else 3
+        self.n_channels = opt['n_channels'] or 3
         self.patch_size = self.opt['H_size'] if opt['H_size'] else 128
 
-        self.quality_factor = opt['quality_factor'] if opt['quality_factor'] else 40
-        self.quality_factor_test = opt['quality_factor_test'] if opt['quality_factor_test'] else 40
-        self.is_color = opt['is_color'] if opt['is_color'] else False
+        self.quality_factor = opt['quality_factor'] or 40
+        self.quality_factor_test = opt['quality_factor_test'] or 40
+        self.is_color = opt['is_color'] or False
 
         # -------------------------------------
         # get the path of H, return None if input is None
@@ -23,11 +23,11 @@ class DatasetJPEG(data.Dataset):
 
     def __getitem__(self, index):
 
+        # -------------------------------------
+        # get H image
+        # -------------------------------------
+        H_path = self.paths_H[index]
         if self.opt['phase'] == 'train':
-            # -------------------------------------
-            # get H image
-            # -------------------------------------
-            H_path = self.paths_H[index]
             img_H = util.imread_uint(H_path, 3)
             L_path = H_path
 
@@ -86,7 +86,6 @@ class DatasetJPEG(data.Dataset):
             img_L = img_L[rnd_h:rnd_h + self.patch_size, rnd_w:rnd_w + self.patch_size]
         else:
 
-            H_path = self.paths_H[index]
             L_path = H_path
             # ---------------------------------
             # set quality factor
@@ -102,7 +101,7 @@ class DatasetJPEG(data.Dataset):
                 img_L = cv2.cvtColor(img_L, cv2.COLOR_BGR2RGB)
             else:
                 img_H = cv2.imread(H_path, cv2.IMREAD_UNCHANGED)
-                is_to_ycbcr = True if img_L.ndim == 3 else False
+                is_to_ycbcr = img_L.ndim == 3
                 if is_to_ycbcr:
                     img_H = cv2.cvtColor(img_H, cv2.COLOR_BGR2RGB)
                     img_H = util.rgb2ycbcr(img_H)

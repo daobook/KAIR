@@ -43,8 +43,8 @@ class FFDNet(nn.Module):
 
         self.m_down = B.PixelUnShuffle(upscale_factor=sf)
 
-        m_head = B.conv(in_nc*sf*sf+1, nc, mode='C'+act_mode[-1], bias=bias)
-        m_body = [B.conv(nc, nc, mode='C'+act_mode, bias=bias) for _ in range(nb-2)]
+        m_head = B.conv(in_nc*sf*sf+1, nc, mode=f'C{act_mode[-1]}', bias=bias)
+        m_body = [B.conv(nc, nc, mode=f'C{act_mode}', bias=bias) for _ in range(nb-2)]
         m_tail = B.conv(nc, out_nc*sf*sf, mode='C', bias=bias)
 
         self.model = B.sequential(m_head, *m_body, m_tail)

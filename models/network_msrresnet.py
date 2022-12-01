@@ -55,7 +55,7 @@ class MSRResNet0(nn.Module):
 
         m_head = B.conv(in_nc, nc, mode='C')
 
-        m_body = [B.ResBlock(nc, nc, mode='C'+act_mode+'C') for _ in range(nb)]
+        m_body = [B.ResBlock(nc, nc, mode=f'C{act_mode}C') for _ in range(nb)]
         m_body.append(B.conv(nc, nc, mode='C'))
 
         if upsample_mode == 'upconv':
@@ -67,11 +67,15 @@ class MSRResNet0(nn.Module):
         else:
             raise NotImplementedError('upsample mode [{:s}] is not found'.format(upsample_mode))
         if upscale == 3:
-            m_uper = upsample_block(nc, nc, mode='3'+act_mode)
+            m_uper = upsample_block(nc, nc, mode=f'3{act_mode}')
         else:
-            m_uper = [upsample_block(nc, nc, mode='2'+act_mode) for _ in range(n_upscale)]
+            m_uper = [
+                upsample_block(nc, nc, mode=f'2{act_mode}')
+                for _ in range(n_upscale)
+            ]
 
-        H_conv0 = B.conv(nc, nc, mode='C'+act_mode)
+
+        H_conv0 = B.conv(nc, nc, mode=f'C{act_mode}')
         H_conv1 = B.conv(nc, out_nc, bias=False, mode='C')
         m_tail = B.sequential(H_conv0, H_conv1)
 
@@ -125,7 +129,7 @@ class MSRResNet1(nn.Module):
         if self.upscale == 4:
             out = self.lrelu(self.pixel_shuffle(self.upconv1(out)))
             out = self.lrelu(self.pixel_shuffle(self.upconv2(out)))
-        elif self.upscale == 3 or self.upscale == 2:
+        elif self.upscale in [3, 2]:
             out = self.lrelu(self.pixel_shuffle(self.upconv1(out)))
 
         out = self.conv_last(self.lrelu(self.HRconv(out)))
@@ -139,14 +143,9 @@ def initialize_weights(net_l, scale=1):
         net_l = [net_l]
     for net in net_l:
         for m in net.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, (nn.Conv2d, nn.Linear)):
                 init.kaiming_normal_(m.weight, a=0, mode='fan_in')
                 m.weight.data *= scale  # for residual block
-                if m.bias is not None:
-                    m.bias.data.zero_()
-            elif isinstance(m, nn.Linear):
-                init.kaiming_normal_(m.weight, a=0, mode='fan_in')
-                m.weight.data *= scale
                 if m.bias is not None:
                     m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
@@ -155,9 +154,7 @@ def initialize_weights(net_l, scale=1):
 
 
 def make_layer(block, n_layers):
-    layers = []
-    for _ in range(n_layers):
-        layers.append(block())
+    layers = [block() for _ in range(n_layers)]
     return nn.Sequential(*layers)
 
 
